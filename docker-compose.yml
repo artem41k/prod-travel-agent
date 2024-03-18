@@ -1,0 +1,32 @@
+services:
+  backend:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: "tragent"
+      POSTGRES_USER: "ta_back"
+      POSTGRES_PASSWORD: "secretpassword"
+      POSTGRES_HOST: "postgres"
+      POSTGRES_PORT: 5432
+      DJANGO_SECRET_KEY: "someverysecretkeywithnumbers5432"
+    command: >
+      sh -c "python3 manage.py migrate --noinput && python3 manage.py runserver 0.0.0.0:8080"
+    ports:
+      - "8080:8080"
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_DB: "tragent"
+      POSTGRES_USER: "ta_back"
+      POSTGRES_PASSWORD: "secretpassword"
+    ports:
+      - "5432:5432"
+    healthcheck :
+      test: ["CMD", "pg_isready", "-q", "-d", "tragent", "-U", "ta_back"]
+      interval : 5s
+      timeout : 3s
+      retries : 5
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
