@@ -6,8 +6,8 @@ class User(AbstractUser):
     username = None
     tg_id = models.BigIntegerField(null=True, unique=True)
     age = models.PositiveIntegerField(null=True)
-    city = models.CharField(max_length=64, null=True)
-    country = models.CharField(max_length=64, null=True)
+    city = models.CharField(max_length=64)
+    country = models.CharField(max_length=64)
     bio = models.TextField(null=True)
 
     USERNAME_FIELD = 'tg_id'
