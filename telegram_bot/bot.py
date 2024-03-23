@@ -22,6 +22,8 @@ async def main() -> None:
     if bool(os.getenv("DEBUG")) and (filter_id := os.getenv("DEV_TG_ID")):
         dp.message.middleware(FilterIdMiddleware(int(filter_id)))
 
+    print("Bot was successfully initiated, starting polling...")
+
     await dp.start_polling(bot)
 
 if __name__ == '__main__':

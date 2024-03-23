@@ -3,7 +3,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram import F, Router, types
 from aiogram.filters import CommandStart
 
-from utils import msgs, keyboards
+from utils import msgs, keyboards, api
 
 router = Router()
 
@@ -11,17 +11,26 @@ router = Router()
 class Registration(StatesGroup):
     name = State()
     age = State()
-    city_and_country = State()
     bio = State()
     interests = State()
+    location = State()
 
 
 @router.message(CommandStart())
 async def handle_start(message: types.Message, state: FSMContext):
-    await state.set_state(Registration.name)
-    await message.answer(msgs.start_msg)
-    reply_markup = keyboards.skip_markup()
-    await message.answer(msgs.ask_for_name, reply_markup=reply_markup)
+    api_instance = api.API(message.from_user.id)
+    profile, status_code = api_instance.get_profile()
+
+    if status_code == 200:  # If user profile has been found
+        await message.answer(
+            msgs.hello_again % profile['first_name']
+        )
+    else:
+        await state.set_state(Registration.name)
+        await state.update_data(api_instance=api_instance)
+        await message.answer(msgs.start_msg)
+        reply_markup = keyboards.skip_markup()
+        await message.answer(msgs.ask_for_name, reply_markup=reply_markup)
 
 
 @router.message(Registration.name)
@@ -48,9 +57,9 @@ async def handle_age(message: types.Message, state: FSMContext):
     text = message.text.strip()
 
     if text == msgs.skip:
-        await state.set_state(Registration.city_and_country)
+        await state.set_state(Registration.bio)
         await message.answer(
-            msgs.ask_for_city_and_country, reply_markup=keyboards.CLEAR
+            msgs.ask_for_bio, reply_markup=reply_markup
         )
         return
 
@@ -68,42 +77,11 @@ async def handle_age(message: types.Message, state: FSMContext):
         return
 
     await state.update_data(age=age)
-    await state.set_state(Registration.city_and_country)
+    await state.set_state(Registration.bio)
 
     await message.answer(
-        msgs.ask_for_city_and_country, reply_markup=keyboards.CLEAR
+        msgs.ask_for_bio, reply_markup=reply_markup
     )
-
-
-@router.message(Registration.city_and_country, F.location)
-async def handle_location_city_and_country(
-        message: types.Message, state: FSMContext):
-    location = message.location
-
-    reply_markup = keyboards.skip_markup()
-
-    await state.update_data(location=location)
-    await state.set_state(Registration.bio)
-    await message.answer(msgs.ask_for_bio, reply_markup=reply_markup)
-
-
-@router.message(Registration.city_and_country)
-async def handle_city_and_country(
-        message: types.Message, state: FSMContext):
-    spl = message.text.strip().split(", ")
-
-    reply_markup = keyboards.skip_markup()
-
-    if len(spl) != 2:
-        await message.answer(
-            msgs.wrong_city_and_country, reply_markup=reply_markup
-        )
-        return
-
-    # validate_city_and_country
-
-    await state.set_state(Registration.bio)
-    await message.answer(msgs.ask_for_bio, reply_markup=reply_markup)
 
 
 @router.message(Registration.bio)
@@ -112,12 +90,43 @@ async def handle_bio(message: types.Message, state: FSMContext):
 
     if text != msgs.skip:
         await state.update_data(bio=text)
+    await state.set_state(Registration.location)
+    await message.answer(msgs.ask_for_location, reply_markup=keyboards.CLEAR)
+
+
+@router.message(Registration.location, F.location)
+async def handle_location(
+        message: types.Message, state: FSMContext):
+    location = message.location
+
+    await state.update_data(lat=location.latitude, lon=location.longitude)
     await end_registration(message, state)
 
 
-async def end_registration(message: types.message, state: FSMContext):
+@router.message(Registration.location)
+async def handle_text_location(
+        message: types.Message, state: FSMContext):
+    text = message.text.strip()
+
+    if len(text.split(", ")) != 2:
+        await message.answer(msgs.wrong_location)
+        return
+
+    await state.update_data(location=text)
+    await end_registration(message, state)
+
+
+async def end_registration(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
-    print(data)  # For debug
+    api_instance = data.pop('api_instance')
 
-    # call api to create a user
+    new_profile, status_code = api_instance.create_user(**data)
+
+    if status_code == 400:
+        await message.answer(msgs.location_not_found)
+    else:
+        await state.clear()
+
+        await message.answer(msgs.profile_is_ready)
+        await message.answer(msgs.get_profile_msg(**new_profile))
