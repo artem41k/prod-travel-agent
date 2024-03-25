@@ -14,7 +14,7 @@ class API:
             'Authentication': signer.sign(str(tg_id))
         }
 
-    def _get(self, relative_url: str) -> tuple[dict, int]:
+    def _get(self, relative_url: str) -> tuple[dict | list, int]:
         response = requests.get(
             self.backend_url + relative_url,
             headers=self.headers
@@ -40,4 +40,23 @@ class API:
             'profile/create/',
             tg_id=self.tg_id, first_name=first_name, last_name=last_name,
             age=age, location=location, lat=lat, lon=lon, bio=bio
+        )
+
+    def get_trips(self) -> tuple[list, int]:
+        return self._get('trips/')
+
+    def get_trip(self, trip_id: int) -> tuple[dict, int]:
+        return self._get(f'trips/{trip_id}/')
+
+    def create_trip(self, name: str,
+                    description: str | None = None) -> tuple[dict, int]:
+        return self._post('trips/', name=name, description=description)
+
+    def add_location(self, trip_id: int, start_date: str, end_date: str,
+                     query: str | None = None, lat: float | None = None,
+                     lon: float | None = None) -> tuple[dict, int]:
+        return self._post(
+            f'trips/{trip_id}/add_location/',
+            query=query, lat=lat, lon=lon,
+            start_date=start_date, end_date=end_date
         )

@@ -1,4 +1,4 @@
-from rest_framework import serializers
+from rest_framework import serializers, exceptions
 
 from .maps import OSM
 from .models import User, Trip, Note, UserLocation, TripLocation
@@ -11,9 +11,62 @@ class UserLocationSerializer(serializers.ModelSerializer):
 
 
 class TripLocationSerializer(serializers.ModelSerializer):
+    query = serializers.CharField(write_only=True, required=False)
+
     class Meta:
         model = TripLocation
-        fields = ['name', 'lat', 'lon', 'trip', 'start_date', 'end_date']
+        fields = [
+            'name', 'query', 'lat', 'lon',
+            'trip', 'start_date', 'end_date'
+        ]
+        extra_kwargs = {
+            'name': {'read_only': True},
+            'lat': {'required': False},
+            'lon': {'required': False},
+        }
+
+    def validate_query(self, value: str) -> UserLocation:
+        """ Validate query if it was provided in request body as text """
+        city, country, data = OSM().get_city_by_name(value)
+        if data:
+            return TripLocation(
+                city=city,
+                country=country,
+                lat=data['lat'],
+                lon=data['lon'],
+                data=data
+            )
+        else:
+            raise exceptions.NotFound('Location not found')
+
+    def validate(self, attrs: dict) -> dict:
+        """ Validate location if it was provided as lat & lon
+            (and validate if there are any location params or not)
+        """
+        if (lat := attrs.get('lat')) and (lon := attrs.get('lon')):
+            city, country, data = OSM().get_city_by_coords(lat, lon)
+            attrs['location'] = TripLocation(
+                city=city,
+                country=country,
+                lat=data['lat'],
+                lon=data['lon'],
+                data=data
+            )
+        elif location := attrs.get('query'):
+            attrs['location'] = location
+        else:
+            raise serializers.ValidationError(
+                'You must provide either location or lat and lon'
+            )
+        return attrs
+
+    def create(self, validated_data: dict) -> TripLocation:
+        trip_location = validated_data['location']
+        trip_location.start_date = validated_data['start_date']
+        trip_location.end_date = validated_data['end_date']
+        trip_location.trip = validated_data['trip']
+        trip_location.save()
+        return trip_location
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -100,7 +153,10 @@ class TripSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Trip
-        fields = '__all__'
+        fields = [
+            'id', 'name', 'description', 'owner', 'start_date', 'end_date',
+            'participants', 'locations', 'notes'
+        ]
 
     def validate(self, attrs: dict) -> dict:
         attrs['owner'] = self.context['request'].user

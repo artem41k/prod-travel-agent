@@ -3,7 +3,7 @@ from aiogram.client.default import DefaultBotProperties
 import asyncio
 import os
 
-from handlers import registration
+from handlers import registration, main_menu, trips, locations
 from utils.middlewares import FilterIdMiddleware
 
 bot = Bot(
@@ -16,7 +16,10 @@ dp = Dispatcher()
 
 async def main() -> None:
     dp.include_routers(
-        registration.router
+        registration.router,
+        main_menu.router,
+        trips.router,
+        locations.router,
     )
 
     if bool(os.getenv("DEBUG")) and (filter_id := os.getenv("DEV_TG_ID")):

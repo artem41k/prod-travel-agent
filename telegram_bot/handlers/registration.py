@@ -91,7 +91,10 @@ async def handle_bio(message: types.Message, state: FSMContext):
     if text != msgs.skip:
         await state.update_data(bio=text)
     await state.set_state(Registration.location)
-    await message.answer(msgs.ask_for_location, reply_markup=keyboards.CLEAR)
+    await message.answer(
+        msgs.ask_for_location,
+        reply_markup=keyboards.request_location_markup
+    )
 
 
 @router.message(Registration.location, F.location)

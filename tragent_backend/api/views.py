@@ -1,4 +1,5 @@
 from django.contrib.auth.models import AnonymousUser
+from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework.generics import (GenericAPIView, CreateAPIView,
                                      RetrieveUpdateAPIView)
@@ -23,6 +24,26 @@ class TripViewSet(ModelViewSet):
 
     def get_queryset(self):
         return self.model.objects.filter(owner=self.request.user)
+
+    @action(detail=True, methods=['post'])
+    def add_location(self, request, pk) -> Response:
+        # it's necessary, because request.data is is immutable QueryDict
+        data = {k: v for k, v in request.data.items()}
+        data['trip'] = pk
+        serializer = serializers.TripLocationSerializer(
+            data=data
+        )
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                serializer.data, status=status.HTTP_201_CREATED
+            )
+        else:
+            print('serializer is not valid')
+            print(serializer.data)
+            return Response(
+                serializer.errors, status=status.HTTP_400_BAD_REQUEST
+            )
 
 
 class NoteViewSet(ModelViewSet):

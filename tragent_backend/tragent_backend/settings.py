@@ -111,4 +111,6 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ),
+    'DATE_INPUT_FORMATS': ['%d.%m.%y'],
+    'DATE_FORMAT': '%d.%m.%y',
 }

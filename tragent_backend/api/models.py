@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
+import datetime
+
 
 class User(AbstractUser):
     username = None
@@ -17,6 +19,7 @@ class User(AbstractUser):
 
 class Trip(models.Model):
     name = models.CharField(max_length=64)
+    description = models.TextField(null=True)
     owner = models.ForeignKey(
         User,
         on_delete=models.CASCADE, related_name='trips'
@@ -24,6 +27,16 @@ class Trip(models.Model):
     participants = models.ManyToManyField(
         User, related_name='participating_trips'
     )
+
+    @property
+    def start_date(self) -> datetime.date | None:
+        if len(locations := self.locations.all()) > 0:
+            return min(locations.values_list('start_date'))[0]
+
+    @property
+    def end_date(self) -> datetime.date | None:
+        if len(locations := self.locations.all()) > 0:
+            return max(locations.values_list('end_date'))[0]
 
 
 class Note(models.Model):
