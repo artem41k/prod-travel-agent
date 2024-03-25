@@ -16,7 +16,7 @@ class TripLocationSerializer(serializers.ModelSerializer):
     class Meta:
         model = TripLocation
         fields = [
-            'name', 'query', 'lat', 'lon',
+            'id', 'name', 'query', 'lat', 'lon',
             'trip', 'start_date', 'end_date'
         ]
         extra_kwargs = {
@@ -45,13 +45,16 @@ class TripLocationSerializer(serializers.ModelSerializer):
         """
         if (lat := attrs.get('lat')) and (lon := attrs.get('lon')):
             city, country, data = OSM().get_city_by_coords(lat, lon)
-            attrs['location'] = TripLocation(
-                city=city,
-                country=country,
-                lat=data['lat'],
-                lon=data['lon'],
-                data=data
-            )
+            if city:
+                attrs['location'] = TripLocation(
+                    city=city,
+                    country=country,
+                    lat=data['lat'],
+                    lon=data['lon'],
+                    data=data
+                )
+            else:
+                raise exceptions.NotFound('Location not found')
         elif location := attrs.get('query'):
             attrs['location'] = location
         else:
@@ -91,17 +94,22 @@ class UserSerializer(serializers.ModelSerializer):
         """
         if (lat := attrs.get('lat')) and (lon := attrs.get('lon')):
             city, country, data = OSM().get_city_by_coords(lat, lon)
-            attrs['location'] = UserLocation(
-                city=city,
-                country=country,
-                lat=data['lat'],
-                lon=data['lon'],
-                data=data
-            )
+            if data:
+                attrs['location'] = UserLocation(
+                    city=city,
+                    country=country,
+                    lat=data['lat'],
+                    lon=data['lon'],
+                    data=data
+                )
+            else:
+                raise exceptions.NotFound('Location not found')
         elif not attrs.get('location'):
             raise serializers.ValidationError(
                 'You must provide either location or lat and lon'
             )
+        attrs.pop('lat', None)  # remove unnecessary keys
+        attrs.pop('lon', None)
         return attrs
 
     def validate_location(self, value: str) -> UserLocation:
@@ -116,12 +124,10 @@ class UserSerializer(serializers.ModelSerializer):
                 data=data
             )
         else:
-            raise serializers.ValidationError('Invalid location')
+            raise exceptions.NotFound('Location not found')
 
-    def create(self, validated_data) -> User:
+    def create(self, validated_data: dict) -> User:
         location = validated_data.pop('location')
-        validated_data.pop('lat')  # remove unnecessary keys
-        validated_data.pop('lon')
 
         user = User.objects.create(**validated_data)
         # Only to register users from telegram
@@ -131,6 +137,13 @@ class UserSerializer(serializers.ModelSerializer):
         location.user = user
         location.save()
         return user
+
+    def update(self, instance: User, validated_data: dict) -> User:
+        if location := validated_data.pop('location', None):
+            instance.location.delete()
+            location.user = instance
+            location.save()
+        return super().update(instance, validated_data)
 
 
 class NoteSerializer(serializers.ModelSerializer):

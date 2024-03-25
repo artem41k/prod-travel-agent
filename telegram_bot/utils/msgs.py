@@ -7,6 +7,9 @@ internal_error = (
     'Попробуйте ещё раз, вдруг повезёт)'
 )
 max_length_error = try_again % 'Превышена максимальная длина'
+not_digits = try_again % 'Сообщение должно состоять только из цифр'
+
+operation_cancelled = 'Действие отменено'
 
 # Start & Registration
 
@@ -94,6 +97,10 @@ change_order_button = 'Изменить порядок🔁'
 delete_some_button = 'Удалить некоторые❌'
 edit_trip_button = 'Редактировать📝'
 delete_trip_button = 'Удалить путешествие❌'
+route_button = 'Маршрут🗺'
+share_location_button = 'Поделиться местоположением📍'
+
+show_trip = 'Открыть путешествие'
 
 trips_header = '<b>Ваши путешествия</b>'
 
@@ -171,7 +178,43 @@ location_added = (
 added_num_locations = '<b>Добавлено %d локаций✅</b>'
 
 choose_action = 'Выберите, что вы хотите сделать:'
+choose_what_to_edit = 'Выберите, что вы хотите изменить:'
 
 
-def get_locations_msg(locations: list) -> str:
-    return construct_locations(locations, enum=True) + '\n' + choose_action
+def get_locations_msg(
+        trip_name: str, locations: list, action: str = '') -> str:
+    locations_msg = construct_locations(locations, enum=True)
+    return f'{trip_name}\n\n{locations_msg}\n{action}'
+
+
+delete_locations_text = (
+    'Напишите номера локаций из списка, '
+    'которые хотите удалить, без запятых и пробелов\n'
+    'Например: <code>1234</code>'
+)
+
+successfully_deleted_label = '<b>Успешно удалены локации:</b>'
+werent_in_list_label = '<b>Номера локаций, которых не было в списке:</b>'
+
+
+def deleted_locations_msg(successful: list, werent_in_list: list) -> str:
+    msg = ''
+    if len(successful) > 0:
+        msg += successfully_deleted_label
+        for loc in successful:
+            msg += f'\n<i>{loc["name"]}</i>'
+    if len(werent_in_list) > 0:
+        msg += werent_in_list_label
+        for num in werent_in_list:
+            msg += f'\n{num}'
+    return msg
+
+
+drive_by_car_time = 'Поездка на машине займёт %d часов'
+
+sad_2004_error = (
+    'Бесплатная версия API, которую я использую для построения '
+    'маршрутов не даёт построить маршрут, который хотя бы приблизительно '
+    'превышает 6000 км :(\nПопробуйте удалить самую дальнюю локацию, '
+    'тогда всё должно построиться)'
+)

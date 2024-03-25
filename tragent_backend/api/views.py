@@ -1,6 +1,8 @@
 from django.contrib.auth.models import AnonymousUser
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, APIException
 from rest_framework.generics import (GenericAPIView, CreateAPIView,
                                      RetrieveUpdateAPIView)
 from rest_framework.permissions import AllowAny
@@ -8,8 +10,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework import status
 
-from . import serializers
-from . import models
+from . import serializers, models, maps
 
 
 # For testing
@@ -45,6 +46,39 @@ class TripViewSet(ModelViewSet):
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
 
+    @action(detail=True, methods=['post'])
+    def delete_location(self, request, pk) -> Response:
+        if location_id := request.data.get('location_id'):
+            location = get_object_or_404(models.TripLocation, pk=location_id)
+            serialized = serializers.TripLocationSerializer(location)
+            location.delete()
+            return Response(serialized.data, status=status.HTTP_200_OK)
+        else:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True)
+    def route(self, request, pk) -> HttpResponse:
+        trip = self.get_object()
+        locations = trip.locations.all()
+        if len(locations) == 0:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+
+        home = trip.owner.location
+
+        locations = [home, *list(locations)]
+
+        try:
+            map_img, distance, duration = maps.generate_route(locations, home)
+        except APIException as exc:
+            return Response(
+                {'detail': exc.detail},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        response = HttpResponse(content_type='image/jpg')
+        map_img.save(response, 'JPEG')
+        return response
+
 
 class NoteViewSet(ModelViewSet):
     model = models.Note
@@ -61,6 +95,7 @@ class CreateUserView(CreateAPIView):
 class ProfileView(RetrieveUpdateAPIView):
     model = models.User
     serializer_class = serializers.UserSerializer
+    queryset = model.objects.all()
 
     def get_object(self):
         if not isinstance(self.request.user, AnonymousUser):

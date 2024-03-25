@@ -27,7 +27,7 @@ def request_location_markup() -> types.ReplyKeyboardMarkup:
             [types.KeyboardButton(
                 text=msgs.share_location_button, request_location=True
             )]
-        ]
+        ], resize_keyboard=True
     )
 
 

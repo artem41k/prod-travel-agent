@@ -31,7 +31,9 @@ async def handle_trip_list(
         await call.answer(msgs.internal_error)
 
 
-async def trip_view(event: types.Message | types.CallbackQuery, trip_id: int):
+async def trip_view(event: types.Message | types.CallbackQuery,
+                    trip_id: int,
+                    provided_user_id: int | None = None):
     if isinstance(event, types.Message):
         message = event
         user_id = message.from_user.id
@@ -43,22 +45,29 @@ async def trip_view(event: types.Message | types.CallbackQuery, trip_id: int):
     else:
         raise TypeError
 
+    if provided_user_id:
+        user_id = provided_user_id
+
     trip, status_code = api.API(user_id).get_trip(trip_id)
 
     if status_code == 200:
         if len(trip['locations']) > 0:
-            locations_button = (
-                msgs.edit_locations_button,
-                TripCallback(action='edit_locations', id=trip_id)
-            )
+            buttons = [
+                (msgs.route_button, TripCallback(action='route', id=trip_id)),
+                (
+                    msgs.edit_locations_button,
+                    TripCallback(action='edit_locations', id=trip_id)
+                )
+            ]
         else:
-            locations_button = (
-                msgs.add_locations_button,
-                TripCallback(action='add_locations', id=trip_id)
-            )
+            buttons = [
+                (
+                    msgs.add_locations_button,
+                    TripCallback(action='add_locations', id=trip_id)
+                )
+            ]
 
-        buttons = [
-            locations_button,
+        buttons += [
             (
                 msgs.delete_trip_button,
                 TripCallback(action='delete', id=trip_id)
@@ -85,6 +94,15 @@ async def trip_view(event: types.Message | types.CallbackQuery, trip_id: int):
 async def handle_trip_view(
         call: types.CallbackQuery, callback_data: TripCallback):
     await trip_view(call, callback_data.id)
+
+
+@router.callback_query(TripCallback.filter(F.action == 'show'))
+async def handle_trip_show(
+        call: types.CallbackQuery, callback_data: TripCallback):
+    await trip_view(
+        call.message, callback_data.id,
+        provided_user_id=call.from_user.id
+    )
 
 
 class CreateTrip(StatesGroup):
@@ -132,3 +150,31 @@ async def handle_trip_description(message: types.Message, state: FSMContext):
         await trip_view(message, new_trip['id'])
     else:
         await message.answer(msgs.internal_error)
+
+
+@router.callback_query(TripCallback.filter(F.action == 'route'))
+async def handle_trip_route(call: types.CallbackQuery,
+                            callback_data: TripCallback):
+    trip_id = callback_data.id
+    route_img_bytes, status_code = api.API(
+        call.from_user.id
+    ).get_route(trip_id)
+    await call.answer()
+
+    if status_code == 200:
+        buttons = [
+            (msgs.show_trip, TripCallback(action='show', id=trip_id))
+        ]
+        markup = keyboards.build_inline_markup(buttons)
+        await call.message.edit_reply_markup(None)
+        await call.message.answer_photo(
+            types.BufferedInputFile(
+                route_img_bytes, filename='route.jpg'
+            ),
+            caption=msgs.drive_by_car_time % 0,
+            reply_markup=markup
+        )
+    elif status_code == 400 and route_img_bytes['detail'] == '2004':
+        await call.message.answer(msgs.sad_2004_error)
+    else:
+        await call.answer(msgs.internal_error)

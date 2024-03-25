@@ -93,5 +93,65 @@ async def handle_edit_locations(call: types.CallbackQuery,
 
         await call.answer()
         await call.message.edit_text(
-            msgs.get_locations_msg(trip['locations']), reply_markup=markup
+            msgs.get_locations_msg(
+                trip['name'], trip['locations'], msgs.choose_action
+            ), reply_markup=markup
         )
+
+
+class DeleteLocations(StatesGroup):
+    delete_ids = State()
+
+
+@router.callback_query(TripCallback.filter(F.action == 'delete_locations'))
+async def handle_delete_locations(call: types.CallbackQuery,
+                                  callback_data: TripCallback,
+                                  state: FSMContext):
+    api_inst = api.API(call.from_user.id)
+    trip, status_code = api_inst.get_trip(callback_data.id)
+
+    if status_code == 200:
+        await call.answer()
+        await state.set_state(DeleteLocations.delete_ids)
+        numerated_ids = {
+            index + 1: loc['id'] for index, loc in enumerate(trip['locations'])
+        }
+        await state.update_data(
+            api_inst=api_inst, numerated_ids=numerated_ids, trip_id=trip['id']
+        )
+        await call.message.edit_text(
+            msgs.get_locations_msg(
+                trip['name'], trip['locations'], msgs.delete_locations_text
+            )
+        )
+
+
+@router.message(DeleteLocations.delete_ids)
+async def handle_delete_ids(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    if not text.isdigit():
+        await message.answer(msgs.not_digits)
+        return
+
+    data = await state.get_data()
+    api_inst = data['api_inst']
+
+    successful = []
+    werent_in_list = []
+
+    for id in map(int, text.split()):
+        location_id = data['numerated_ids'].get(id)
+        if location_id:
+            deleted, status_code = api_inst.delete_location(
+                trip_id=data['trip_id'], location_id=location_id
+            )
+            if status_code == 200:
+                successful.append(deleted)
+        else:
+            werent_in_list.append(id)
+
+    await state.clear()
+    await message.answer(
+        msgs.deleted_locations_msg(successful, werent_in_list)
+    )
+    await trip_view(message, data['trip_id'])

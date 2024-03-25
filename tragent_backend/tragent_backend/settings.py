@@ -114,3 +114,25 @@ REST_FRAMEWORK = {
     'DATE_INPUT_FORMATS': ['%d.%m.%y'],
     'DATE_FORMAT': '%d.%m.%y',
 }
+
+
+ROUTE = {
+    'MAP': {
+        'WIDTH': 800,
+        'HEIGHT': 800,
+    },
+    'LINE': {
+        'COLORS': {
+            'MAIN': 'blue',
+            'HOME': 'lightblue',
+        },
+        'WIDTH': 4,
+    },
+    'POINT': {
+        'WIDTH': 12,
+        'COLORS': {
+            'MAIN': 'blue',
+            'HOME': 'darkcyan',
+        },
+    }
+}

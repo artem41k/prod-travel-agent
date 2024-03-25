@@ -23,7 +23,8 @@ async def handle_start(message: types.Message, state: FSMContext):
 
     if status_code == 200:  # If user profile has been found
         await message.answer(
-            msgs.hello_again % profile['first_name']
+            msgs.hello_again % profile['first_name'],
+            reply_markup=keyboards.CLEAR
         )
     else:
         await state.set_state(Registration.name)
@@ -93,7 +94,7 @@ async def handle_bio(message: types.Message, state: FSMContext):
     await state.set_state(Registration.location)
     await message.answer(
         msgs.ask_for_location,
-        reply_markup=keyboards.request_location_markup
+        reply_markup=keyboards.request_location_markup()
     )
 
 
@@ -126,7 +127,7 @@ async def end_registration(message: types.Message, state: FSMContext):
 
     new_profile, status_code = api_instance.create_user(**data)
 
-    if status_code == 400:
+    if status_code in (400, 404):
         await message.answer(msgs.location_not_found)
     else:
         await state.clear()

@@ -19,14 +19,30 @@ class API:
             self.backend_url + relative_url,
             headers=self.headers
         )
-        return (response.json(), response.status_code)
+        return response.json(), response.status_code
 
     def _post(self, relative_url: str, **kwargs) -> tuple[dict, int]:
         response = requests.post(
             self.backend_url + relative_url,
             data=kwargs, headers=self.headers
         )
-        return (response.json(), response.status_code)
+        return response.json(), response.status_code
+
+    def _put(self, relative_url: str, data: dict) -> tuple[dict, int]:
+        response = requests.put(
+            self.backend_url + relative_url,
+            data=data, headers=self.headers
+        )
+        return response.json(), response.status_code
+
+    def _get_content(self, relative_url: str) -> tuple[bytes, int]:
+        response = requests.get(
+            self.backend_url + relative_url,
+            headers=self.headers
+        )
+        status_code = response.status_code
+        content = response.content if status_code == 200 else response.json()
+        return content, status_code
 
     def get_profile(self) -> tuple[dict, int]:
         return self._get('profile/')
@@ -40,6 +56,12 @@ class API:
             'profile/create/',
             tg_id=self.tg_id, first_name=first_name, last_name=last_name,
             age=age, location=location, lat=lat, lon=lon, bio=bio
+        )
+
+    def update_user(self, **kwargs) -> tuple[dict, int]:
+        return self._put(
+            'profile/',
+            data=kwargs
         )
 
     def get_trips(self) -> tuple[list, int]:
@@ -60,3 +82,13 @@ class API:
             query=query, lat=lat, lon=lon,
             start_date=start_date, end_date=end_date
         )
+
+    def delete_location(self, trip_id: int,
+                        location_id: int) -> tuple[dict, int]:
+        return self._post(
+            f'trips/{trip_id}/delete_location/',
+            location_id=location_id
+        )
+
+    def get_route(self, trip_id: int) -> tuple[bytes, int]:
+        return self._get_content(f'trips/{trip_id}/route/')
