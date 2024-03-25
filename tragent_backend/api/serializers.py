@@ -104,7 +104,7 @@ class UserSerializer(serializers.ModelSerializer):
                 )
             else:
                 raise exceptions.NotFound('Location not found')
-        elif not attrs.get('location'):
+        elif not attrs.get('location') and not self.partial:
             raise serializers.ValidationError(
                 'You must provide either location or lat and lon'
             )

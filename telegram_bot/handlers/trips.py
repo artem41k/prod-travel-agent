@@ -4,6 +4,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 from utils import msgs, keyboards, api
 from utils.callbacks import TripCallback
+from . import main_menu
 
 router = Router()
 
@@ -70,9 +71,20 @@ async def trip_view(event: types.Message | types.CallbackQuery,
         buttons += [
             (
                 msgs.delete_trip_button,
-                TripCallback(action='delete', id=trip_id)
+                TripCallback(action='delete', id=trip_id, name=trip['name'])
             ),
-            (msgs.edit_trip_button, TripCallback(action='edit', id=trip_id)),
+            [
+                (
+                    msgs.edit_trip_name_button,
+                    TripCallback(action='edit', id=trip_id, field='name')
+                ),
+                (
+                    msgs.edit_trip_description_button,
+                    TripCallback(
+                        action='edit', id=trip_id, field='description'
+                    )
+                ),
+            ],
             keyboards.MENU_BUTTON,
         ]
 
@@ -146,7 +158,9 @@ async def handle_trip_description(message: types.Message, state: FSMContext):
     await state.clear()
 
     if status_code == 201:
-        await message.answer(msgs.trip_created)
+        await message.answer(
+            msgs.trip_created, reply_markup=keyboards.CLEAR
+        )
         await trip_view(message, new_trip['id'])
     else:
         await message.answer(msgs.internal_error)
@@ -156,12 +170,13 @@ async def handle_trip_description(message: types.Message, state: FSMContext):
 async def handle_trip_route(call: types.CallbackQuery,
                             callback_data: TripCallback):
     trip_id = callback_data.id
-    route_img_bytes, status_code = api.API(
+    route_img_bytes, headers, status_code = api.API(
         call.from_user.id
     ).get_route(trip_id)
     await call.answer()
 
     if status_code == 200:
+        distance = int(headers['DISTANCE']) / 1000  # m to km
         buttons = [
             (msgs.show_trip, TripCallback(action='show', id=trip_id))
         ]
@@ -171,10 +186,90 @@ async def handle_trip_route(call: types.CallbackQuery,
             types.BufferedInputFile(
                 route_img_bytes, filename='route.jpg'
             ),
-            caption=msgs.drive_by_car_time % 0,
+            caption=msgs.drive_by_car % str(distance),
             reply_markup=markup
         )
     elif status_code == 400 and route_img_bytes['detail'] == '2004':
         await call.message.answer(msgs.sad_2004_error)
     else:
         await call.answer(msgs.internal_error)
+
+
+@router.callback_query(TripCallback.filter(F.action == 'delete'))
+async def handle_trip_delete(call: types.CallbackQuery,
+                             callback_data: TripCallback):
+    trip_id = callback_data.id
+    trip_name = callback_data.name
+    status_code = api.API(
+        call.from_user.id
+    ).delete_trip(trip_id)
+    await call.answer()
+
+    if status_code == 204:
+        await call.message.edit_text(
+            msgs.trip_successfully_deleted % trip_name
+        )
+        text, markup = main_menu.get_menu(call.from_user.id)
+        await call.message.answer(text, reply_markup=markup)
+    else:
+        await call.answer(msgs.internal_error)
+
+
+class EditTrip(StatesGroup):
+    name = State()
+    description = State()
+
+
+@router.callback_query(TripCallback.filter(F.action == 'edit'))
+async def handle_edit(call: types.CallbackQuery,
+                      callback_data: TripCallback,
+                      state: FSMContext):
+    trip_id = callback_data.id
+    if callback_data.field == 'name':
+        await state.set_state(EditTrip.name)
+        msg = msgs.trip_edit_name
+    elif callback_data.field == 'description':
+        await state.set_state(EditTrip.description)
+        msg = msgs.trip_edit_description
+    await state.update_data(trip_id=trip_id)
+    await call.message.edit_reply_markup(None)
+    await call.message.answer(
+        msg, reply_markup=keyboards.CLEAR
+    )
+
+
+@router.message(EditTrip.name)
+async def handle_edit_name(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+
+    if len(text) > 64:
+        await message.answer(msgs.max_length_error)
+        return
+
+    data = await state.get_data()
+
+    trip, status_code = api.API(
+        message.from_user.id
+    ).update_trip(data['trip_id'], name=text)
+
+    if status_code == 200:
+        await message.answer(msgs.name_edited)
+        await trip_view(message, trip['id'])
+    else:
+        await message.answer(msgs.internal_error)
+
+
+@router.message(EditTrip.description)
+async def handle_edit_description(message: types.Message, state: FSMContext):
+    text = message.text.strip()
+    data = await state.get_data()
+
+    trip, status_code = api.API(
+        message.from_user.id
+    ).update_trip(data['trip_id'], description=text)
+
+    if status_code == 200:
+        await message.answer(msgs.description_edited)
+        await trip_view(message, trip['id'])
+    else:
+        await message.answer(msgs.internal_error)

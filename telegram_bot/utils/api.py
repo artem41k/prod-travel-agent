@@ -28,12 +28,19 @@ class API:
         )
         return response.json(), response.status_code
 
-    def _put(self, relative_url: str, data: dict) -> tuple[dict, int]:
-        response = requests.put(
+    def _patch(self, relative_url: str, data: dict) -> tuple[dict, int]:
+        response = requests.patch(
             self.backend_url + relative_url,
             data=data, headers=self.headers
         )
         return response.json(), response.status_code
+
+    def _delete(self, relative_url: str) -> int:
+        response = requests.delete(
+            self.backend_url + relative_url,
+            headers=self.headers
+        )
+        return response.status_code
 
     def _get_content(self, relative_url: str) -> tuple[bytes, int]:
         response = requests.get(
@@ -42,7 +49,7 @@ class API:
         )
         status_code = response.status_code
         content = response.content if status_code == 200 else response.json()
-        return content, status_code
+        return content, response.headers, status_code
 
     def get_profile(self) -> tuple[dict, int]:
         return self._get('profile/')
@@ -59,7 +66,7 @@ class API:
         )
 
     def update_user(self, **kwargs) -> tuple[dict, int]:
-        return self._put(
+        return self._patch(
             'profile/',
             data=kwargs
         )
@@ -92,3 +99,9 @@ class API:
 
     def get_route(self, trip_id: int) -> tuple[bytes, int]:
         return self._get_content(f'trips/{trip_id}/route/')
+
+    def update_trip(self, trip_id: int, **kwargs) -> tuple[dict, int]:
+        return self._patch(f'trips/{trip_id}/', data=kwargs)
+
+    def delete_trip(self, trip_id: int) -> int:
+        return self._delete(f'trips/{trip_id}/')

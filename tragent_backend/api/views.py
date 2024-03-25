@@ -40,8 +40,6 @@ class TripViewSet(ModelViewSet):
                 serializer.data, status=status.HTTP_201_CREATED
             )
         else:
-            print('serializer is not valid')
-            print(serializer.data)
             return Response(
                 serializer.errors, status=status.HTTP_400_BAD_REQUEST
             )
@@ -68,7 +66,7 @@ class TripViewSet(ModelViewSet):
         locations = [home, *list(locations)]
 
         try:
-            map_img, distance, duration = maps.generate_route(locations, home)
+            map_img, distance = maps.generate_route(locations, home)
         except APIException as exc:
             return Response(
                 {'detail': exc.detail},
@@ -76,6 +74,10 @@ class TripViewSet(ModelViewSet):
             )
 
         response = HttpResponse(content_type='image/jpg')
+        # Yes, I send distance in headers...
+        # I know it's a horrible hack, but I don't want to save routes
+        # to a database or something, so that's all I came up with
+        response.headers['DISTANCE'] = distance
         map_img.save(response, 'JPEG')
         return response
 

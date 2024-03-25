@@ -4,7 +4,9 @@ from typing import Optional
 
 class TripCallback(CallbackData, prefix='trips'):
     action: str
+    field: Optional[str] = None
     id: Optional[int] = None
+    name: Optional[str] = None
 
 
 class ProfileCallback(CallbackData, prefix='profile'):

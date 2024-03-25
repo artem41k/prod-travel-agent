@@ -70,7 +70,7 @@ def render_map(route: list[list], points: list[dict]) -> Image:
 
 def generate_route(
         locations: models.Location,
-        home: models.Location | None = None) -> tuple[Image, int, int]:
+        home: models.Location | None = None) -> tuple[Image, int]:
     ors = ORS(api_key=os.getenv('ORS_API_KEY'))
     try:
         route = ors.directions(
@@ -103,4 +103,4 @@ def generate_route(
 
     map_img = render_map(route.geometry, points)
 
-    return map_img, route.distance, route.duration
+    return map_img, route.distance
