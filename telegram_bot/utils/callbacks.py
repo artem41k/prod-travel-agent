@@ -7,6 +7,7 @@ class TripCallback(CallbackData, prefix='trips'):
     field: Optional[str] = None
     id: Optional[int] = None
     name: Optional[str] = None
+    confirm: Optional[str] = None
 
 
 class ProfileCallback(CallbackData, prefix='profile'):

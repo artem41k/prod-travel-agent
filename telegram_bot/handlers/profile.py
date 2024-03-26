@@ -101,6 +101,9 @@ async def update_location(message: types.Message, state: FSMContext):
     else:
         await state.clear()
         await message.answer(
+            msgs.location_edited, reply_markup=keyboards.CLEAR
+        )
+        await message.answer(
             msgs.get_profile_msg(**profile),
             reply_markup=keyboards.build_inline_markup([keyboards.MENU_BUTTON])
         )

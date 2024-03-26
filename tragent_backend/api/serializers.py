@@ -141,6 +141,8 @@ class UserSerializer(serializers.ModelSerializer):
     def update(self, instance: User, validated_data: dict) -> User:
         if location := validated_data.pop('location', None):
             instance.location.delete()
+            if isinstance(location, dict):
+                location = location['name']
             location.user = instance
             location.save()
         return super().update(instance, validated_data)

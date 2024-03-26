@@ -1,4 +1,5 @@
 from aiogram import F, Router, types
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
@@ -69,10 +70,6 @@ async def trip_view(event: types.Message | types.CallbackQuery,
             ]
 
         buttons += [
-            (
-                msgs.delete_trip_button,
-                TripCallback(action='delete', id=trip_id, name=trip['name'])
-            ),
             [
                 (
                     msgs.edit_trip_name_button,
@@ -85,6 +82,10 @@ async def trip_view(event: types.Message | types.CallbackQuery,
                     )
                 ),
             ],
+            (
+                msgs.delete_trip_button,
+                TripCallback(action='delete', id=trip_id, name=trip['name'])
+            ),
             keyboards.MENU_BUTTON,
         ]
 
@@ -195,24 +196,77 @@ async def handle_trip_route(call: types.CallbackQuery,
         await call.answer(msgs.internal_error)
 
 
-@router.callback_query(TripCallback.filter(F.action == 'delete'))
+class DeleteTrip(StatesGroup):
+    confirm = State()
+
+
+@router.callback_query(
+    TripCallback.filter(F.action == 'delete'),
+    StateFilter(None)
+)
+async def handle_trip_delete_call(call: types.CallbackQuery,
+                                  callback_data: TripCallback,
+                                  state: FSMContext):
+    trip_id = callback_data.id
+    trip_name = callback_data.name
+
+    buttons = [
+        (
+            msgs.sure,
+            TripCallback(
+                action='delete', id=trip_id, name=trip_name, confirm='yes'
+            )
+        ),
+        (
+            msgs.cancel,
+            TripCallback(
+                action='delete', id=trip_id, name=trip_name, confirm='no'
+            )
+        ),
+    ]
+    markup = keyboards.build_inline_markup(buttons)
+
+    await state.set_state(DeleteTrip.confirm)
+    await call.message.edit_text(
+        msgs.are_you_sure_delete_trip % trip_name, reply_markup=markup
+    )
+
+
+@router.callback_query(
+    TripCallback.filter(F.action == 'delete' and F.confirm == 'yes'),
+    DeleteTrip.confirm
+)
 async def handle_trip_delete(call: types.CallbackQuery,
-                             callback_data: TripCallback):
+                             callback_data: TripCallback,
+                             state: FSMContext):
     trip_id = callback_data.id
     trip_name = callback_data.name
     status_code = api.API(
         call.from_user.id
     ).delete_trip(trip_id)
     await call.answer()
+    await state.clear()
 
     if status_code == 204:
         await call.message.edit_text(
             msgs.trip_successfully_deleted % trip_name
         )
-        text, markup = main_menu.get_menu(call.from_user.id)
+        text, markup = await main_menu.get_menu(call.from_user.id)
         await call.message.answer(text, reply_markup=markup)
     else:
         await call.answer(msgs.internal_error)
+
+
+@router.callback_query(
+    TripCallback.filter(F.action == 'delete' and F.confirm == 'no'),
+    DeleteTrip.confirm
+)
+async def handle_trip_delete_cancel(call: types.CallbackQuery,
+                                    callback_data: TripCallback,
+                                    state: FSMContext):
+    await state.clear()
+    print('Trip view')
+    await trip_view(call, callback_data.id)
 
 
 class EditTrip(StatesGroup):
