@@ -134,6 +134,9 @@ class UserSerializer(serializers.ModelSerializer):
         # (see "Future expansion" section in README)
         user.set_unusable_password()
 
+        if isinstance(location, dict):
+            location = location['name']
+
         location.user = user
         location.save()
         return user
