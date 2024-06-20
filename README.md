@@ -9,13 +9,13 @@
 ## Запуск с помощью docker compose
 ### Склонируйте репозиторий
 
-`gh repo clone Central-University-IT-prod/backend-artem41k`
+`gh repo clone artem41k/prod-travel-agent`
 
 (пример с использованием Github CLI)
 
 ### Перейдите в директорию проекта
 
-`cd backend-artem41k`
+`cd prod-travel-agent`
 
 ### Введите команду
 
